@@ -8,8 +8,6 @@ dependencies = [
   "pydantic>=2",
   "python-dotenv",
   "semantic-kernel==1.24.0",
-  # In proper split, depend on published contracts:
-  # "myapp-contracts==0.1.0",
 ]
 
-[tool.uv]  # optional if you use uv
+[tool.uv]
