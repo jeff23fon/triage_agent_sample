@@ -1,0 +1,10 @@
+.ruff.toml
+[tool.ruff]
+line-length = 88
+exclude = ["__pycache__", ".ruff_cache"]
+extend-ignore = ["E501"]
+
+.gitignore
+.venv
+__pycache__
+.ruff_cache
