@@ -10,4 +10,59 @@ dependencies = [
   "semantic-kernel==1.24.0",
 ]
 
-[tool.uv]
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra --cov=app --cov-report=term-missing"
+testpaths = ["tests/unit"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.ruff]
+exclude = [
+  ".bzr",
+  ".direnv",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".hg",
+  ".ipynb_checkpoints",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pyenv",
+  ".pytest_cache",
+  ".pytype",
+  ".ruff_cache",
+  ".svn",
+  ".tox",
+  ".venv",
+  ".vscode",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "site-packages",
+  "venv",
+  "tests/",
+]
+
+target-version = "py312"
+
+line-length = 100
+indent-width = 4
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "S", "I", "N", "FAST"]
+exclude = ["*.ipynb", "tests/"]
+# asserts allowed in tests
+
+[lint.per-file-ignores]
+"tests/*.py" = ["S101"]
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = "dynamic"

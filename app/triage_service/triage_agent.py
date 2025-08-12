@@ -1,50 +1,19 @@
+import logging
 import os
-from dataclasses import dataclass
-from typing import Sequence, cast
 from uuid import uuid4
 
-from app.models.models import (
-    ChatMessageContent,
-    ChatRequest,
-    ChatResponse,
-)
 from semantic_kernel.agents import ChatCompletionAgent
 from semantic_kernel.connectors.ai.function_choice_behavior import (
     FunctionChoiceBehavior,
 )
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
-from semantic_kernel.contents.chat_history import ChatHistory  # Add this import
-from semantic_kernel.contents.chat_message_content import (
-    ChatMessageContent as SKChatMessageContent,
-)
-from semantic_kernel.contents.utils.author_role import AuthorRole as SKAuthorRole
+from semantic_kernel.contents.chat_history import ChatHistory
+from semantic_kernel.contents.chat_message_content import ChatMessageContent
+from semantic_kernel.contents.image_content import ImageContent
+from semantic_kernel.contents.text_content import TextContent
+from semantic_kernel.contents.utils.author_role import AuthorRole
 
-
-@dataclass
-class _AgentMessageAdapter:
-    role: str
-    content: str | list[SKChatMessageContent]
-
-
-def _adapt_content(c: ChatMessageContent) -> str | list[SKChatMessageContent]:
-    if isinstance(c, str):
-        return c
-    return cast(list[SKChatMessageContent], c)
-
-
-def _role(role: str) -> SKAuthorRole:
-    return SKAuthorRole.USER if role == "user" else SKAuthorRole.ASSISTANT
-
-
-def to_sk_messages(messages: Sequence[_AgentMessageAdapter]) -> list[SKChatMessageContent]:
-    out: list[SKChatMessageContent] = []
-    for m in messages:
-        if isinstance(m.content, str):
-            out.append(SKChatMessageContent(role=_role(m.role), content=m.content))
-        else:
-            # Already SKChatMessageContent list (e.g., tool messages)
-            out.extend(m.content)
-    return out
+from app.models.models import ChatRequest, ChatResponse, TextBlock
 
 
 class SKTriageAgent:
@@ -66,36 +35,65 @@ class SKTriageAgent:
             raise RuntimeError("Missing AZURE_OPENAI_ENDPOINT/KEY/DEPLOYMENT for triage service.")
 
         billing_agent = ChatCompletionAgent(
-            service=AzureChatCompletion(api_key=api_key, endpoint=endpoint, deployment_name=deployment),
+            service=AzureChatCompletion(
+                api_key=api_key, endpoint=endpoint, deployment_name=deployment
+            ),
             name="BillingAgent",
-            instructions="You handle billing issues like charges, payment methods, cycles, fees, discrepancies, and payment failures.",
+            instructions="""You handle billing issues like charges, payment methods, cycles, fees, 
+            discrepancies, and payment failures.""",
             function_choice_behavior=FunctionChoiceBehavior.Auto(),  # type: ignore
         )
         refund_agent = ChatCompletionAgent(
-            service=AzureChatCompletion(api_key=api_key, endpoint=endpoint, deployment_name=deployment),
+            service=AzureChatCompletion(
+                api_key=api_key, endpoint=endpoint, deployment_name=deployment
+            ),
             name="RefundAgent",
-            instructions="Assist users with refund inquiries, including eligibility, policies, processing, and status updates.",
+            instructions="""Assist users with refund inquiries, including eligibility, policies, 
+            processing, and status updates.""",
             function_choice_behavior=FunctionChoiceBehavior.Auto(),  # type: ignore
         )
         triage_agent = ChatCompletionAgent(
-            service=AzureChatCompletion(api_key=api_key, endpoint=endpoint, deployment_name=deployment),
+            service=AzureChatCompletion(
+                api_key=api_key, endpoint=endpoint, deployment_name=deployment
+            ),
             name="TriageAgent",
-            instructions="Evaluate user requests and forward them to BillingAgent or RefundAgent for targeted assistance. Provide the full answer to the user containing any information from the agents.",
+            instructions="""Evaluate user requests and forward them to BillingAgent or RefundAgent 
+            for targeted assistance. Provide the full answer to the user containing any information 
+            from the agents.""",
             plugins=[billing_agent, refund_agent],
             function_choice_behavior=FunctionChoiceBehavior.Auto(),  # type: ignore
         )
         self._agents_cache["triage"] = triage_agent
         return triage_agent
 
+    def _chat_request_to_sk_history(self, request: ChatRequest) -> ChatHistory:
+        sk_messages: list[ChatMessageContent] = []
+        for m in request.messages:
+            role = AuthorRole.USER if m.role == "user" else AuthorRole.ASSISTANT
+            if isinstance(m.content, str):
+                sk_messages.append(ChatMessageContent(role=role, content=m.content))
+            else:
+                items: list[TextContent | ImageContent] = []
+                for item in m.content:
+                    if isinstance(item, TextBlock):
+                        items.append(TextContent(text=item.text))
+                    else:
+                        items.append(ImageContent(url=item.image_url.url))
+                if items:
+                    sk_messages.append(ChatMessageContent(role=role, items=items))  # type: ignore
+        return ChatHistory(messages=sk_messages)
+
     async def invoke(self, request: ChatRequest) -> ChatResponse:
-        triage_agent = self._get_triage_agent()
-        adapted: Sequence[_AgentMessageAdapter] = [
-            _AgentMessageAdapter(role=m.role, content=_adapt_content(m.content)) for m in request.messages
-        ]
-        chat_message_list = to_sk_messages(adapted)
-        chat_history = ChatHistory(messages=chat_message_list)  # Wrap in ChatHistory 
-        result = await triage_agent.get_response(chat_history)
+        triage_agent: ChatCompletionAgent = self._get_triage_agent()
+        chat_history: ChatHistory = self._chat_request_to_sk_history(request)
         conversation_id = request.conversation_id or str(uuid4())
         message_id = str(uuid4())
-        answer = str(result.content) if result else "No response from agent"
+        try:
+            result: ChatMessageContent = await triage_agent.get_response(chat_history)  # type: ignore
+        except Exception as e:
+            logging.error(f"Error occurred while invoking triage agent: {e}")
+            result = ChatMessageContent(
+                role=AuthorRole.SYSTEM, content="An error occurred while processing your request."
+            )
+        answer = str(result.content) if result else "No response from agent"  # type: ignore
         return ChatResponse(answer=answer, conversation_id=conversation_id, message_id=message_id)
