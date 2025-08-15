@@ -21,33 +21,47 @@ class SKTriageAgent:
     def __init__(self, service: AzureChatCompletion) -> None:
         self._agents_cache: dict[str, ChatCompletionAgent] = {}
         self._service = service
+    
+    def _create_agent(
+        self,
+        service: AzureChatCompletion,
+        name: str,
+        instructions: str,
+        plugins: list[object] | dict[str, object] | None = None,
+        function_choice_behavior: FunctionChoiceBehavior | None = None,
+    ) -> ChatCompletionAgent:
+        return ChatCompletionAgent(
+            service=service,
+            name=name,
+            instructions=instructions,
+            plugins=plugins if plugins is not None else None,
+            function_choice_behavior=function_choice_behavior if function_choice_behavior \
+                is not None else FunctionChoiceBehavior.Auto(),  # type: ignore
+        )
 
     def _get_triage_agent(self) -> ChatCompletionAgent:
         if "triage" in self._agents_cache:
             return self._agents_cache["triage"]
 
-        billing_agent = ChatCompletionAgent(
+        billing_agent = self._create_agent(
             service=self._service,
             name="BillingAgent",
-            instructions="""You handle billing issues like charges, payment methods, cycles, fees, 
+            instructions="""You handle billing issues like charges, payment methods, cycles, fees,
             discrepancies, and payment failures.""",
-            function_choice_behavior=FunctionChoiceBehavior.Auto(),  # type: ignore
         )
-        refund_agent = ChatCompletionAgent(
+        refund_agent = self._create_agent(
             service=self._service,
             name="RefundAgent",
-            instructions="""Assist users with refund inquiries, including eligibility, policies, 
+            instructions="""Assist users with refund inquiries, including eligibility, policies,
             processing, and status updates.""",
-            function_choice_behavior=FunctionChoiceBehavior.Auto(),  # type: ignore
         )
-        triage_agent = ChatCompletionAgent(
+        triage_agent = self._create_agent(
             service=self._service,
             name="TriageAgent",
             instructions="""Evaluate user requests and forward them to BillingAgent or RefundAgent 
             for targeted assistance. Provide the full answer to the user containing any information 
             from the agents.""",
             plugins=[billing_agent, refund_agent],
-            function_choice_behavior=FunctionChoiceBehavior.Auto(),  # type: ignore
         )
         self._agents_cache["triage"] = triage_agent
         return triage_agent
