@@ -1,5 +1,4 @@
 import logging
-import os
 from uuid import uuid4
 
 from semantic_kernel.agents import ChatCompletionAgent
@@ -19,43 +18,30 @@ from app.models.models import ChatRequest, ChatResponse, TextBlock
 class SKTriageAgent:
     """Semantic Kernel triage agent (no storage; service-only)."""
 
-    def __init__(self) -> None:
+    def __init__(self, service: AzureChatCompletion) -> None:
         self._agents_cache: dict[str, ChatCompletionAgent] = {}
+        self._service = service
 
     def _get_triage_agent(self) -> ChatCompletionAgent:
         if "triage" in self._agents_cache:
             return self._agents_cache["triage"]
 
-        # Read env directly in the service (no dependency on app_settings)
-        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-        api_key = os.getenv("AZURE_OPENAI_KEY")
-        deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT")
-
-        if not endpoint or not api_key or not deployment:
-            raise RuntimeError("Missing AZURE_OPENAI_ENDPOINT/KEY/DEPLOYMENT for triage service.")
-
         billing_agent = ChatCompletionAgent(
-            service=AzureChatCompletion(
-                api_key=api_key, endpoint=endpoint, deployment_name=deployment
-            ),
+            service=self._service,
             name="BillingAgent",
             instructions="""You handle billing issues like charges, payment methods, cycles, fees, 
             discrepancies, and payment failures.""",
             function_choice_behavior=FunctionChoiceBehavior.Auto(),  # type: ignore
         )
         refund_agent = ChatCompletionAgent(
-            service=AzureChatCompletion(
-                api_key=api_key, endpoint=endpoint, deployment_name=deployment
-            ),
+            service=self._service,
             name="RefundAgent",
             instructions="""Assist users with refund inquiries, including eligibility, policies, 
             processing, and status updates.""",
             function_choice_behavior=FunctionChoiceBehavior.Auto(),  # type: ignore
         )
         triage_agent = ChatCompletionAgent(
-            service=AzureChatCompletion(
-                api_key=api_key, endpoint=endpoint, deployment_name=deployment
-            ),
+            service=self._service,
             name="TriageAgent",
             instructions="""Evaluate user requests and forward them to BillingAgent or RefundAgent 
             for targeted assistance. Provide the full answer to the user containing any information 
