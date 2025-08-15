@@ -8,8 +8,6 @@ from app.models.models import ChatRequest, ChatResponse
 from app.triage_service.triage_agent import SKTriageAgent
 from app.utils.azure_config import app_settings
 
-agent = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
