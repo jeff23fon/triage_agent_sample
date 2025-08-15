@@ -14,11 +14,15 @@ def make_settings_config(env_prefix: str = "") -> SettingsConfigDict:
 
 class AzureOpenAISettings(BaseSettings):
     model_config = make_settings_config("AZURE_OPENAI_")
-    endpoint: str = Field(..., alias="ENDPOINT")
-    key: str = Field(..., alias="KEY")
-    deployment: str = Field(..., alias="DEPLOYMENT")
-    version: str = Field("", alias="VERSION")  # Optional
+    endpoint: str
+    key: str
+    deployment: str
+    version: str = ""  # Optional
+
 
 class AppSettings(BaseSettings):
     model_config = make_settings_config()
     azure_openai: AzureOpenAISettings = Field(default_factory=AzureOpenAISettings)  # type: ignore
+
+
+app_settings = AppSettings()

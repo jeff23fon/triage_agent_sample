@@ -6,9 +6,9 @@ from fastapi import FastAPI
 
 from app.models.models import ChatRequest, ChatResponse
 from app.triage_service.triage_agent import SKTriageAgent
-from app.utils.azure_config import AzureOpenAISettings
+from app.utils.azure_config import app_settings
 
-settings = AzureOpenAISettings()
+settings = app_settings
 
 agent = SKTriageAgent()
 
