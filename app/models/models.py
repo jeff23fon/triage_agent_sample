@@ -1,6 +1,6 @@
 from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class TextBlock(BaseModel):
@@ -28,11 +28,11 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
-    settings: dict[str, Any] = Field(default_factory=dict)
-    conversation_id: str | None = None
+    settings: Optional[dict[str, Any]] = None
+    conversation_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
     answer: str
-    conversation_id: str
-    message_id: str
+    conversation_id: Optional[str] = None
+    message_id: Optional[str] = None
