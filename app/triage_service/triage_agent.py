@@ -21,22 +21,21 @@ class SKTriageAgent:
     def __init__(self, service: AzureChatCompletion) -> None:
         self._agents_cache: dict[str, ChatCompletionAgent] = {}
         self._service = service
-    
+
     def _create_agent(
         self,
         service: AzureChatCompletion,
         name: str,
         instructions: str,
         plugins: list[object] | dict[str, object] | None = None,
-        function_choice_behavior: FunctionChoiceBehavior | None = None,
+        function_choice_behavior: FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
     ) -> ChatCompletionAgent:
         return ChatCompletionAgent(
             service=service,
             name=name,
             instructions=instructions,
             plugins=plugins if plugins is not None else None,
-            function_choice_behavior=function_choice_behavior if function_choice_behavior \
-                is not None else FunctionChoiceBehavior.Auto(),  # type: ignore
+            function_choice_behavior=function_choice_behavior,
         )
 
     def _get_triage_agent(self) -> ChatCompletionAgent:
