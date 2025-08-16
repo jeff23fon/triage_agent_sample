@@ -1,4 +1,5 @@
 import logging
+from uuid import uuid4
 
 from semantic_kernel.agents import ChatCompletionAgent
 from semantic_kernel.connectors.ai.function_choice_behavior import (
@@ -86,6 +87,8 @@ class SKTriageAgent:
     async def invoke(self, request: ChatRequest) -> ChatResponse:
         triage_agent: ChatCompletionAgent = self._get_triage_agent()
         chat_history: ChatHistory = self._chat_request_to_sk_history(request)
+        conversation_id = request.conversation_id or str(uuid4())
+        message_id = str(uuid4())
         try:
             result: ChatMessageContent = await triage_agent.get_response(chat_history) # type: ignore
         except Exception as e:
@@ -94,4 +97,8 @@ class SKTriageAgent:
                 role=AuthorRole.SYSTEM, content="An error occurred while processing your request."
             )
         answer = str(result.content) if result else "No response from agent" # type: ignore
-        return ChatResponse(answer=answer)
+        return ChatResponse(
+            answer=answer,
+            conversation_id=conversation_id,
+            message_id=message_id,
+        )
