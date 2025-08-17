@@ -4,7 +4,7 @@ response=$(curl -s -X POST http://localhost:8082/v1/agents/triage \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [
-      {"role": "user", "content": "What is your name?"}
+      {"role": "user", "content": "i want refund. I got charged twice!"}
     ],
     "settings": {},
     "conversation_id": "abc123"

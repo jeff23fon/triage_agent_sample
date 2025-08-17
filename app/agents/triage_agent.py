@@ -1,10 +1,9 @@
 import logging
 from uuid import uuid4
 
+from semantic_kernel import Kernel
 from semantic_kernel.agents import ChatCompletionAgent
-from semantic_kernel.connectors.ai.function_choice_behavior import (
-    FunctionChoiceBehavior,
-)
+from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
 from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.contents.chat_message_content import ChatMessageContent
@@ -19,25 +18,26 @@ class SKTriageAgent:
     """Semantic Kernel triage agent (no storage; service-only)."""
 
     def __init__(self, service: AzureChatCompletion) -> None:
+        self._kernel = Kernel()
+        self._kernel.add_service(service)
         self._agents_cache: dict[str, ChatCompletionAgent] = {}
-        self._service = service
 
     def _create_agent(
         self,
-        service: AzureChatCompletion,
         name: str,
         instructions: str,
         plugins: list[object] | dict[str, object] | None = None,
         function_choice_behavior: FunctionChoiceBehavior | None = None,
+        kernel: Kernel | None = None,
     ) -> ChatCompletionAgent:
         if function_choice_behavior is None:
             function_choice_behavior = FunctionChoiceBehavior.Auto()  # type: ignore
         return ChatCompletionAgent(
-            service=service,
             name=name,
             instructions=instructions,
             plugins=plugins if plugins is not None else None,
             function_choice_behavior=function_choice_behavior,
+            kernel=kernel,
         )
 
     def _get_triage_agent(self) -> ChatCompletionAgent:
@@ -45,24 +45,24 @@ class SKTriageAgent:
             return self._agents_cache["triage"]
 
         billing_agent = self._create_agent(
-            service=self._service,
             name="BillingAgent",
             instructions="""You handle billing issues like charges, payment methods, cycles, fees,
             discrepancies, and payment failures.""",
+            kernel=self._kernel,
         )
         refund_agent = self._create_agent(
-            service=self._service,
             name="RefundAgent",
             instructions="""Assist users with refund inquiries, including eligibility, policies,
             processing, and status updates.""",
+            kernel=self._kernel,
         )
         triage_agent = self._create_agent(
-            service=self._service,
             name="TriageAgent",
             instructions="""Evaluate user requests and forward them to BillingAgent or RefundAgent 
             for targeted assistance. Provide the full answer to the user containing any information 
             from the agents.""",
             plugins=[billing_agent, refund_agent],
+            kernel=self._kernel,
         )
         self._agents_cache["triage"] = triage_agent
         return triage_agent
@@ -90,13 +90,13 @@ class SKTriageAgent:
         conversation_id = request.conversation_id or str(uuid4())
         message_id = str(uuid4())
         try:
-            result: ChatMessageContent = await triage_agent.get_response(chat_history) # type: ignore
+            result: ChatMessageContent = await triage_agent.get_response(chat_history)  # type: ignore
         except Exception as e:
             logging.error(f"Error occurred while invoking triage agent: {e}")
             result = ChatMessageContent(
                 role=AuthorRole.SYSTEM, content="An error occurred while processing your request."
             )
-        answer = str(result.content) if result else "No response from agent" # type: ignore
+        answer = str(result.content) if result else "No response from agent"  # type: ignore
         return ChatResponse(
             answer=answer,
             conversation_id=conversation_id,
